@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <h2>💰 Expense Tracker</h2>
+      <p>Personal Finance Manager</p>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-item active" data-view="dashboard" onclick="showView('dashboard')">
+        <span class="icon">📊</span> Dashboard
+      </div>
+      <div class="nav-item" data-view="expenses" onclick="showView('expenses')">
+        <span class="icon">📋</span> Expenses
+      </div>
+      <div class="nav-item" data-view="upload" onclick="showView('upload')">
+        <span class="icon">📄</span> Upload PDF
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- ── DASHBOARD VIEW ─────────────────────────────── -->
+    <div id="view-dashboard" class="view">
+      <div class="page-header">
+        <div>
+          <h2>Dashboard</h2>
+          <p>Your spending overview</p>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-end;">
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px;">From</label>
+            <input type="date" id="dash-start" style="width:145px;" onchange="loadDashboard()" />
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label style="font-size:12px;">To</label>
+            <input type="date" id="dash-end" style="width:145px;" onchange="loadDashboard()" />
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="clearDashboardFilter()">Clear</button>
+        </div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="cards-grid">
+        <div class="card">
+          <div class="card-icon">💵</div>
+          <div class="card-label">Total Spent</div>
+          <div class="card-value green" id="dash-total">—</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">🧾</div>
+          <div class="card-label">Transactions</div>
+          <div class="card-value blue" id="dash-count">—</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">🏆</div>
+          <div class="card-label">Top Category</div>
+          <div class="card-value" id="dash-top-cat" style="font-size:18px;">—</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">📅</div>
+          <div class="card-label">Avg per Transaction</div>
+          <div class="card-value" id="dash-avg" style="font-size:20px;">—</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>By Category</h3>
+          <div class="chart-wrap"><canvas id="chart-category"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Monthly Spending</h3>
+          <div class="chart-wrap"><canvas id="chart-monthly"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EXPENSES VIEW ──────────────────────────────── -->
+    <div id="view-expenses" class="view hidden">
+      <div class="page-header">
+        <div>
+          <h2>Expenses</h2>
+          <p>Manage all your expense records</p>
+        </div>
+        <button class="btn btn-primary" onclick="openAddModal()">+ Add Expense</button>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="filter-bar">
+        <div class="form-group">
+          <label>From Date</label>
+          <input type="date" id="filter-start" />
+        </div>
+        <div class="form-group">
+          <label>To Date</label>
+          <input type="date" id="filter-end" />
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="filter-category">
+            <option value="">All Categories</option>
+            <option>Food</option><option>Transport</option><option>Shopping</option>
+            <option>Bills</option><option>Entertainment</option><option>Healthcare</option>
+            <option>Travel</option><option>Education</option><option>Other</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="applyFilters()">Search</button>
+        <button class="btn btn-outline btn-sm" onclick="clearFilters()">Reset</button>
+      </div>
+
+      <!-- Table -->
+      <div class="table-card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th>Source</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="expense-tbody">
+              <tr><td colspan="6"><div class="empty-state">
+                <div class="spinner" style="margin:auto;border-color:rgba(0,0,0,.1);border-top-color:var(--primary);"></div>
+              </div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <div class="pagination-info" id="pagination-info">—</div>
+          <div class="pagination-btns">
+            <button class="btn btn-outline btn-sm" id="btn-prev" onclick="changePage(-1)">← Prev</button>
+            <button class="btn btn-outline btn-sm" id="btn-next" onclick="changePage(1)">Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── UPLOAD PDF VIEW ───────────────────────────── -->
+    <div id="view-upload" class="view hidden">
+      <div class="page-header">
+        <div>
+          <h2>Upload PDF</h2>
+          <p>Let Gemini AI extract expenses from your bank statement or receipt</p>
+        </div>
+      </div>
+
+      <div class="upload-box">
+        <div class="upload-area" id="drop-zone"
+             onclick="document.getElementById('pdf-input').click()"
+             ondragover="onDragOver(event)"
+             ondragleave="onDragLeave(event)"
+             ondrop="onDrop(event)">
+          <div class="upload-icon">📄</div>
+          <p><strong>Click to browse</strong> or drag & drop your PDF here</p>
+          <p>Bank statements, receipts, invoices</p>
+        </div>
+        <input type="file" id="pdf-input" accept=".pdf" class="hidden" onchange="onFileSelected(event)" />
+        <div id="upload-filename"></div>
+        <button class="btn btn-primary btn-block" id="upload-btn" onclick="uploadPDF()" disabled>
+          🚀 Extract Expenses with AI
+        </button>
+        <div id="upload-result" class="hidden"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Add / Edit Expense Modal -->
+<div id="expense-modal" class="modal-overlay hidden" onclick="closeModalOnBackdrop(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-title">Add Expense</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <form id="expense-form" onsubmit="handleExpenseSubmit(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <input type="number" id="exp-amount" step="0.01" min="0.01" placeholder="0.00" required />
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="exp-date" required />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <select id="exp-category" required>
+          <option value="">Select category</option>
+          <option>Food</option><option>Transport</option><option>Shopping</option>
+          <option>Bills</option><option>Entertainment</option><option>Healthcare</option>
+          <option>Travel</option><option>Education</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="exp-description" placeholder="What did you spend on?" maxlength="500" />
+      </div>
+      <input type="hidden" id="exp-id" />
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="modal-submit-btn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
