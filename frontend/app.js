@@ -10,8 +10,9 @@ const API = 'http://localhost:8000/api/v1';
 const state = {
   page:     1,
   pageSize: 15,
-  charts:   { category: null, monthly: null },
+  charts:   { category: null, monthly: null, budget: null },
   selectedFile: null,
+  budgetItems: [],
 };
 
 // ── API Helper ────────────────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ function showView(name) {
 
   if (name === 'dashboard') loadDashboard();
   if (name === 'expenses')  { state.page = 1; loadExpenses(); }
+  if (name === 'budget')    loadBudgets();
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -405,6 +407,294 @@ function renderUploadResult(expenses) {
   el.classList.remove('hidden');
 }
 
+// ── Budget ───────────────────────────────────────────────────────────────────
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function fillMonthSelect(selectEl) {
+  if (!selectEl) return;
+  const prev = selectEl.value;
+  selectEl.innerHTML = '';
+  for (let m = 1; m <= 12; m++) {
+    const opt = document.createElement('option');
+    opt.value = String(m);
+    opt.textContent = `${MONTHS[m - 1]} (${m})`;
+    selectEl.appendChild(opt);
+  }
+  if (prev) selectEl.value = prev;
+}
+
+function initBudgetFormDefaults() {
+  fillMonthSelect(document.getElementById('budget-add-month'));
+  fillMonthSelect(document.getElementById('budget-edit-month'));
+  const now = new Date();
+  const mSel = document.getElementById('budget-add-month');
+  const yInp = document.getElementById('budget-add-year');
+  if (mSel) mSel.value = String(now.getMonth() + 1);
+  if (yInp) yInp.value = String(now.getFullYear());
+}
+
+function syncBudgetEditCategories() {
+  const src = document.getElementById('budget-add-category');
+  const dst = document.getElementById('budget-edit-category');
+  if (!src || !dst) return;
+  dst.innerHTML = src.innerHTML;
+}
+
+async function loadBudgets() {
+  try {
+    const items = await api('/budgets/status');
+    state.budgetItems = Array.isArray(items) ? items : [];
+    renderBudgetAlerts(state.budgetItems);
+    renderBudgetSummary(state.budgetItems);
+    renderBudgetChart(state.budgetItems);
+    renderBudgetCards(state.budgetItems);
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+function renderBudgetAlerts(items) {
+  const el = document.getElementById('budget-alerts');
+  if (!el) return;
+  const fmt = n => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  let html = '';
+  items.filter(i => i.status === 'danger').forEach(i => {
+    const period = `${MONTHS[i.month - 1]} ${i.year}`;
+    html += `<div class="alert-banner danger">Budget limit exceeded: <strong>${escHtml(i.category)}</strong> (${period}). Spent ${fmt(i.spent)} of ${fmt(i.budget)}.</div>`;
+  });
+  items.filter(i => i.status === 'warning').forEach(i => {
+    const period = `${MONTHS[i.month - 1]} ${i.year}`;
+    html += `<div class="alert-banner warning">Budget almost reached: <strong>${escHtml(i.category)}</strong> (${period}). ${Number(i.percentage_used).toFixed(1)}% used.</div>`;
+  });
+  el.innerHTML = html;
+}
+
+function renderBudgetSummary(items) {
+  const fmt = n => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  const tEl = document.getElementById('budget-sum-total');
+  const sEl = document.getElementById('budget-sum-spent');
+  const rEl = document.getElementById('budget-sum-remaining');
+  if (!items.length) {
+    if (tEl) tEl.textContent = '—';
+    if (sEl) sEl.textContent = '—';
+    if (rEl) {
+      rEl.textContent = '—';
+      rEl.className = 'card-value green';
+      rEl.style.color = '';
+    }
+    return;
+  }
+  const totalB = items.reduce((a, i) => a + i.budget, 0);
+  const totalS = items.reduce((a, i) => a + i.spent, 0);
+  const totalR = items.reduce((a, i) => a + i.remaining, 0);
+  if (tEl) tEl.textContent = fmt(totalB);
+  if (sEl) sEl.textContent = fmt(totalS);
+  if (rEl) {
+    rEl.textContent = fmt(totalR);
+    rEl.className = 'card-value' + (totalR >= 0 ? ' green' : '');
+    rEl.style.color = totalR < 0 ? 'var(--danger)' : '';
+  }
+}
+
+function renderBudgetChart(items) {
+  const ctx = document.getElementById('chart-budget');
+  const card = document.querySelector('.budget-chart-card');
+  if (!ctx || !card) return;
+
+  if (state.charts.budget) {
+    state.charts.budget.destroy();
+    state.charts.budget = null;
+  }
+
+  if (!items.length) {
+    card.classList.add('is-empty');
+    return;
+  }
+  card.classList.remove('is-empty');
+
+  const labels = items.map(i => `${i.category} · ${MONTHS[i.month - 1]} ${i.year}`);
+
+  state.charts.budget = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Budget',
+          data: items.map(i => i.budget),
+          backgroundColor: '#3b82f6',
+          borderRadius: 6,
+        },
+        {
+          label: 'Spent',
+          data: items.map(i => i.spent),
+          backgroundColor: '#10b981',
+          borderRadius: 6,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label(c) {
+              const v = c.parsed.y;
+              return ` ${c.dataset.label}: ₹${Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { maxRotation: 45, minRotation: 0, font: { size: 10 } } },
+        y: {
+          beginAtZero: true,
+          ticks: { callback: v => '₹' + v.toLocaleString('en-IN') },
+        },
+      },
+    },
+  });
+}
+
+function renderBudgetCards(items) {
+  const wrap = document.getElementById('budget-cards-wrap');
+  if (!wrap) return;
+  const fmt = n => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+  if (!items.length) {
+    wrap.innerHTML = `
+      <div class="empty-state" style="background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);">
+        <div class="empty-icon">📭</div>
+        <p>No budgets created yet</p>
+      </div>`;
+    return;
+  }
+
+  wrap.innerHTML = items.map(i => {
+    const period = `${MONTHS[i.month - 1]} ${i.year}`;
+    const pctBar = Math.min(Number(i.percentage_used) || 0, 100);
+    const statusClass = i.status === 'danger' ? 'status-danger' : i.status === 'warning' ? 'status-warning' : '';
+    const remClass = i.remaining < 0 ? ' neg' : '';
+    return `
+      <div class="budget-card ${statusClass}">
+        <div class="budget-card-header">
+          <div>
+            <div class="budget-card-title">${escHtml(i.category)}</div>
+            <div class="budget-card-meta">${period}</div>
+          </div>
+          <div class="budget-card-actions">
+            <button type="button" class="btn btn-outline btn-sm" onclick="openBudgetEditModal('${i.id}')">✏️ Edit</button>
+            <button type="button" class="btn btn-danger btn-sm" onclick="deleteBudget('${i.id}')">🗑️</button>
+          </div>
+        </div>
+        <div class="budget-metrics">
+          <div><span>Budget</span><strong>${fmt(i.budget)}</strong></div>
+          <div><span>Spent</span><strong>${fmt(i.spent)}</strong></div>
+          <div class="${remClass.trim()}"><span>Remaining</span><strong>${fmt(i.remaining)}</strong></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-muted);">
+          <span>${Number(i.percentage_used).toFixed(1)}% used</span>
+          <span class="budget-status-pill ${i.status}">${i.status}</span>
+        </div>
+        <div class="progress-wrap" aria-hidden="true">
+          <div class="progress-fill ${i.status}" style="width:${pctBar}%;"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function handleBudgetCreate(e) {
+  e.preventDefault();
+  const btn = document.getElementById('budget-add-btn');
+  const payload = {
+    category: document.getElementById('budget-add-category').value,
+    amount:   parseFloat(document.getElementById('budget-add-amount').value),
+    month:    parseInt(document.getElementById('budget-add-month').value, 10),
+    year:     parseInt(document.getElementById('budget-add-year').value, 10),
+  };
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    await api('/budgets/', { method: 'POST', body: JSON.stringify(payload) });
+    toast('Budget created!', 'success');
+    document.getElementById('budget-add-form').reset();
+    initBudgetFormDefaults();
+    await loadBudgets();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create budget';
+  }
+}
+
+async function deleteBudget(id) {
+  if (!confirm('Delete this budget?')) return;
+  try {
+    await api(`/budgets/${id}`, { method: 'DELETE' });
+    toast('Budget removed.', 'info');
+    await loadBudgets();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+function openBudgetEditModal(id) {
+  const row = state.budgetItems.find(x => x.id === id);
+  if (!row) return;
+  syncBudgetEditCategories();
+  document.getElementById('budget-edit-id').value       = row.id;
+  document.getElementById('budget-edit-amount').value    = row.budget;
+  document.getElementById('budget-edit-month').value    = String(row.month);
+  document.getElementById('budget-edit-year').value     = String(row.year);
+  const cat = document.getElementById('budget-edit-category');
+  cat.value = row.category;
+  if (cat.value !== row.category) {
+    const opt = document.createElement('option');
+    opt.value = row.category;
+    opt.textContent = row.category;
+    cat.appendChild(opt);
+    cat.value = row.category;
+  }
+  document.getElementById('budget-modal').classList.remove('hidden');
+}
+
+function closeBudgetModal() {
+  document.getElementById('budget-modal').classList.add('hidden');
+}
+
+function closeBudgetModalOnBackdrop(e) {
+  if (e.target === document.getElementById('budget-modal')) closeBudgetModal();
+}
+
+async function handleBudgetEditSubmit(e) {
+  e.preventDefault();
+  const id  = document.getElementById('budget-edit-id').value;
+  const btn = document.getElementById('budget-edit-submit');
+  const payload = {
+    category: document.getElementById('budget-edit-category').value,
+    amount:   parseFloat(document.getElementById('budget-edit-amount').value),
+    month:    parseInt(document.getElementById('budget-edit-month').value, 10),
+    year:     parseInt(document.getElementById('budget-edit-year').value, 10),
+  };
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    await api(`/budgets/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+    toast('Budget updated!', 'success');
+    closeBudgetModal();
+    await loadBudgets();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save changes';
+  }
+}
+
 // ── Utility Helpers ───────────────────────────────────────────────────────────
 
 function formatDate(iso) {
@@ -421,4 +711,5 @@ function escHtml(str) {
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
+initBudgetFormDefaults();
 loadDashboard();

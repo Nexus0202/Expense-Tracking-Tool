@@ -21,6 +21,11 @@ class ExpenseNotFoundError(ExpenseTrackerException):
         super().__init__(f"Expense '{expense_id}' not found.", 404)
 
 
+class BudgetNotFoundError(ExpenseTrackerException):
+    def __init__(self, budget_id: str) -> None:
+        super().__init__(f"Budget '{budget_id}' not found.", 404)
+
+
 class GeminiAPIError(ExpenseTrackerException):
     def __init__(self, detail: str) -> None:
         super().__init__(f"Gemini API error: {detail}", 503)

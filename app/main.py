@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import router
 from app.config import settings
 from app.database.session import engine
-from app.models import Expense  # noqa: F401 — registers model with metadata
+from app.models import Budget, Expense  # noqa: F401 — registers models with metadata
 from app.models.base import Base
 from app.utils.exceptions import (
     ExpenseTrackerException,

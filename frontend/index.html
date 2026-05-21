@@ -28,6 +28,9 @@
       <div class="nav-item" data-view="upload" onclick="showView('upload')">
         <span class="icon">📄</span> Upload PDF
       </div>
+      <div class="nav-item" data-view="budget" onclick="showView('budget')">
+        <span class="icon">💼</span> Budget
+      </div>
     </nav>
   </aside>
 
@@ -183,6 +186,79 @@
       </div>
     </div>
 
+    <!-- ── BUDGET VIEW ─────────────────────────────────── -->
+    <div id="view-budget" class="view hidden">
+      <div class="page-header">
+        <div>
+          <h2>Budget</h2>
+          <p>Set limits by category and track spending against them</p>
+        </div>
+      </div>
+
+      <div class="budget-layout">
+        <div class="budget-form-card">
+          <h3 class="section-title">Add budget</h3>
+          <form id="budget-add-form" onsubmit="handleBudgetCreate(event)">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Category</label>
+                <select id="budget-add-category" required>
+                  <option value="">Select category</option>
+                  <option>Food</option><option>Transport</option><option>Shopping</option>
+                  <option>Bills</option><option>Entertainment</option><option>Healthcare</option>
+                  <option>Travel</option><option>Education</option><option>Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Amount (₹)</label>
+                <input type="number" id="budget-add-amount" step="0.01" min="0.01" placeholder="0.00" required />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Month</label>
+                <select id="budget-add-month" required></select>
+              </div>
+              <div class="form-group">
+                <label>Year</label>
+                <input type="number" id="budget-add-year" min="2000" max="2100" required />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="budget-add-btn">Create budget</button>
+          </form>
+        </div>
+
+        <div class="budget-main">
+          <div id="budget-alerts" class="budget-alerts" aria-live="polite"></div>
+
+          <div class="cards-grid budget-summary-grid" id="budget-summary-row">
+            <div class="card">
+              <div class="card-icon">🎯</div>
+              <div class="card-label">Total budgeted</div>
+              <div class="card-value blue" id="budget-sum-total">—</div>
+            </div>
+            <div class="card">
+              <div class="card-icon">💸</div>
+              <div class="card-label">Total spent (in scope)</div>
+              <div class="card-value" id="budget-sum-spent">—</div>
+            </div>
+            <div class="card">
+              <div class="card-icon">✅</div>
+              <div class="card-label">Total remaining</div>
+              <div class="card-value green" id="budget-sum-remaining">—</div>
+            </div>
+          </div>
+
+          <div class="chart-card budget-chart-card">
+            <h3>Budget vs spent by category</h3>
+            <div class="chart-wrap chart-wrap-tall"><canvas id="chart-budget"></canvas></div>
+          </div>
+
+          <div id="budget-cards-wrap"></div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -221,6 +297,43 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn btn-primary" id="modal-submit-btn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Budget Modal -->
+<div id="budget-modal" class="modal-overlay hidden" onclick="closeBudgetModalOnBackdrop(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Edit budget</h3>
+      <button type="button" class="modal-close" onclick="closeBudgetModal()">×</button>
+    </div>
+    <form id="budget-edit-form" onsubmit="handleBudgetEditSubmit(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Category</label>
+          <select id="budget-edit-category" required></select>
+        </div>
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <input type="number" id="budget-edit-amount" step="0.01" min="0.01" required />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Month</label>
+          <select id="budget-edit-month" required></select>
+        </div>
+        <div class="form-group">
+          <label>Year</label>
+          <input type="number" id="budget-edit-year" min="2000" max="2100" required />
+        </div>
+      </div>
+      <input type="hidden" id="budget-edit-id" />
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeBudgetModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="budget-edit-submit">Save changes</button>
       </div>
     </form>
   </div>
