@@ -172,7 +172,7 @@ DATABASE_URL=sqlite:///./expense_tracker.db   # SQLite file, created automatical
 
 # Google Gemini AI (required for PDF upload feature)
 GEMINI_API_KEY=your-gemini-api-key-here
-GEMINI_MODEL=gemini-1.5-flash
+GEMINI_MODEL=gemini-3.5-flash
 GEMINI_MAX_RETRIES=3
 ```
 

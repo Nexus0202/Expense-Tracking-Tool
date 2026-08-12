@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # Gemini AI
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    GEMINI_MODEL: str = "gemini-3.5-flash"
     GEMINI_MAX_RETRIES: int = 3
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
