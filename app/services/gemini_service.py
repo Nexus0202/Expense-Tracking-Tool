@@ -18,7 +18,19 @@ logger = logging.getLogger(__name__)
 
 _EXTRACTION_PROMPT = """You are a financial data extractor. Analyze the following text from a bank statement, receipt, or financial document.
 
-Extract ALL expense/transaction entries and return them as a JSON array ONLY.
+Extract ONLY expenses that the document holder actually paid/spent. Return them as a JSON array ONLY.
+Do NOT blindly extract every amount, line item, or transaction found in the PDF.
+
+INCLUDE:
+- Amounts the document holder paid, was charged, or that are their own purchases/debits
+- Multiple of the document holder's own expenses, if present
+- A Bill of Supply ONLY when it is itself the document holder's purchase (they paid that amount)
+
+EXCLUDE:
+- Bill of Supply / seller / vendor / restaurant / third-party sections that are NOT the amount the document holder paid
+- Unrelated invoices, supplier bills, party-to-party GST invoices, commission invoices
+- Amounts billed to someone else, reference figures, tax-only lines, and duplicate/subtotal amounts that are not an actual spend
+- If the PDF mixes the document holder's expense with a Bill of Supply or unrelated entries, return ONLY the document holder's expenses
 
 Rules:
 - Return ONLY a valid JSON array — no markdown, no prose, no code fences
@@ -28,11 +40,17 @@ Rules:
 - category: one of ["Food", "Transport", "Shopping", "Bills", "Entertainment", "Healthcare", "Travel", "Education", "Other"]
 - description: brief description of the transaction
 
-If no expenses are found, return an empty array: []
+If no expenses belonging to the document holder are found, return an empty array: []
 
 Text to analyze:
 {text}
 """
+
+_UNRELATED_MARKERS = (
+    "bill of supply",
+    "bills of supply",
+    "bill-of-supply",
+)
 
 _VALID_CATEGORIES = {
     "Food", "Transport", "Shopping", "Bills",
@@ -102,9 +120,35 @@ class GeminiService:
             except (KeyError, ValueError, TypeError) as exc:
                 logger.warning("Skipping expense item %d — %s", idx, exc)
 
+        validated = self._filter_unrelated_entries(validated)
         logger.info("Gemini returned %d valid expense(s)", len(validated))
         return validated
 
+    @staticmethod
+    def _filter_unrelated_entries(items: List[dict]) -> List[dict]:
+        """Drop Bill of Supply entries when they appear alongside the user's own expenses.
+        
+        If the PDF is only a Bill of Supply that the user paid, keep those entries.
+        """
+        if not items:
+            return items
+            
+        def looks_unrelated(item: dict) -> bool:
+            desc = item.get("description", "").lower()
+            return any(marker in desc for marker in _UNRELATED_MARKERS)
+            
+        own_expenses = [item for item in items if not looks_unrelated(item)]
+        unrelated = [item for item in items if looks_unrelated(item)]
+        
+        if own_expenses and unrelated:
+            logger.info(
+                "Filtered %d Bill of Supply / unrelated entries from mixed PDF",
+                len(unrelated),
+            )
+            return own_expenses
+            
+        return items
+        
     @staticmethod
     def _validate_item(item: dict, index: int) -> dict:
         """Validate and normalise a single expense dict from Gemini."""
