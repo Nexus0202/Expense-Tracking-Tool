@@ -119,7 +119,7 @@ expense_tracking_tool/
 ### Step 1 — Open the project folder
 
 ```bash
-cd c:\prasanta\expense_tracking_tool
+cd c:\Project\expense_tracking_tool
 ```
 
 ### Step 2 — Create a virtual environment
