@@ -13,7 +13,10 @@ const state = {
   charts:   { category: null, monthly: null, budget: null },
   selectedFile: null,
   budgetItems: [],
+  currentView: 'dashboard',
 };
+
+const VIEWS = ['dashboard', 'expenses', 'upload', 'budget'];
 
 // ── API Helper ────────────────────────────────────────────────────────────────
 
@@ -45,10 +48,16 @@ function toast(msg, type = 'info') {
 // ── Navigation ────────────────────────────────────────────────────────────────
 
 function showView(name) {
+  if (!VIEWS.includes(name)) name = 'dashboard';
+  state.currentView = name;
+
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   document.getElementById(`view-${name}`).classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelector(`[data-view="${name}"]`)?.classList.add('active');
+
+  const hash = '#' + name;
+  if (location.hash !== hash) history.replaceState(null, '', hash);
 
   if (name === 'dashboard') loadDashboard();
   if (name === 'expenses')  { state.page = 1; loadExpenses(); }
@@ -288,8 +297,7 @@ async function handleExpenseSubmit(e) {
       toast('Expense added!', 'success');
     }
     closeModal();
-    loadExpenses();
-    loadDashboard();
+    if (state.currentView === 'expenses') loadExpenses();
   } catch (err) {
     toast(err.message, 'error');
   } finally {
@@ -303,8 +311,7 @@ async function deleteExpense(id) {
   try {
     await api(`/expenses/${id}`, { method: 'DELETE' });
     toast('Expense deleted.', 'info');
-    loadExpenses();
-    loadDashboard();
+    if (state.currentView === 'expenses') loadExpenses();
   } catch (err) {
     toast(err.message, 'error');
   }
@@ -712,4 +719,5 @@ function escHtml(str) {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 initBudgetFormDefaults();
-loadDashboard();
+const initialView = location.hash.replace('#', '');
+showView(VIEWS.includes(initialView) ? initialView : 'dashboard');

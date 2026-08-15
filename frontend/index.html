@@ -198,7 +198,7 @@
       <div class="budget-layout">
         <div class="budget-form-card">
           <h3 class="section-title">Add budget</h3>
-          <form id="budget-add-form" onsubmit="handleBudgetCreate(event)">
+          <form id="budget-add-form" onsubmit="handleBudgetCreate(event); return false;">
             <div class="form-row">
               <div class="form-group">
                 <label>Category</label>
@@ -269,7 +269,7 @@
       <h3 id="modal-title">Add Expense</h3>
       <button class="modal-close" onclick="closeModal()">×</button>
     </div>
-    <form id="expense-form" onsubmit="handleExpenseSubmit(event)">
+    <form id="expense-form" onsubmit="handleExpenseSubmit(event); return false;">
       <div class="form-row">
         <div class="form-group">
           <label>Amount (₹)</label>
@@ -309,7 +309,7 @@
       <h3>Edit budget</h3>
       <button type="button" class="modal-close" onclick="closeBudgetModal()">×</button>
     </div>
-    <form id="budget-edit-form" onsubmit="handleBudgetEditSubmit(event)">
+    <form id="budget-edit-form" onsubmit="handleBudgetEditSubmit(event); return false;">
       <div class="form-row">
         <div class="form-group">
           <label>Category</label>
